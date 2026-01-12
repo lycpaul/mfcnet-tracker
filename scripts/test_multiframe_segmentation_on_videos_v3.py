@@ -296,7 +296,7 @@ def track_on_video(video_path, depth_video_path, model, args, logger, optflow_mo
                 disp_image = mask_overlay(disp_image, (mask_array==4).astype(np.uint8), color=(0,255,255))
                 
                 # get centroid of tooltip and toolbase for left instrument
-                centroid_locations, prev_left_pose_detected_tips, cX_prev_left, cX_prev_left, disp_image = compute_centroids_and_store('left', mask_array, output, centroid_locations, count,
+                centroid_locations, prev_left_pose_detected_tips, cX_prev_left, cY_prev_left, disp_image = compute_centroids_and_store('left', mask_array, output, centroid_locations, count,
                                                                                                                                          args, disp_image, prev_left_pose_detected_tips, 
                                                                                                                                          cX_prev_left, cY_prev_left)
                 # get centroid of tooltip and toolbase for right instrument
