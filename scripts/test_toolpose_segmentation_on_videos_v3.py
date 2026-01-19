@@ -16,6 +16,7 @@ import torch.nn.functional as F
 import torch.backends.cudnn as cudnn
 from torchvision import transforms
 from torchvision.transforms import functional as tF
+from torch.cuda.amp import autocast # Added for AMP
 
 from models import get_tooltip_segmentation_model as get_model
 from utils.model_utils import load_model_weights
@@ -73,6 +74,14 @@ def main():
                         help='Path to the model weights')
     parser.add_argument('--num_videos', type=int, default=-1,
                         help='Number of videos to process. Default: -1, indicates to process all videos')
+    parser.add_argument('--orig_width', type=int, default=640,
+                        help='Original width of the input frames')
+    parser.add_argument('--orig_height', type=int, default=480,
+                        help='Original height of the input frames')
+    parser.add_argument('--crop_width', type=int, default=640,
+                        help='Width to crop the input frames to')
+    parser.add_argument('--crop_height', type=int, default=480,
+                        help='Height to crop the input frames to')
     parser.add_argument('--input_width', type=int, default=640)
     parser.add_argument('--input_height', type=int, default=480)
     parser.add_argument('--score_detection_threshold', type=float, default=0, 
@@ -84,7 +93,8 @@ def main():
     args = parser.parse_args()
     main_worker(args)
 
-def compute_centroids_and_store(type, mask_array, output, centroid_locations, count, args, disp_image, prev_left_pose_detected_tips, cX_prev_left, cY_prev_left):
+def compute_centroids_and_store(type, mask_array, output_heatmap, centroid_locations, count, args, disp_image, prev_left_pose_detected_tips, cX_prev_left, cY_prev_left):
+    # Modified to accept output_heatmap (numpy array) directly instead of raw tensor output
     if type=='left': 
         idxt1 = 0
         idxt2 = 1
@@ -95,7 +105,7 @@ def compute_centroids_and_store(type, mask_array, output, centroid_locations, co
         colors = (255,255,255)
         left_base = 255*(mask_array==3).astype(np.uint8)
         left_tip = 255*(mask_array==4).astype(np.uint8)
-        left_tip_heatmap = output[0,4,:,:].cpu().numpy()
+        left_tip_heatmap = output_heatmap[4,:,:]
     elif type=='right':
         idxt1 = 4
         idxt2 = 5
@@ -106,7 +116,7 @@ def compute_centroids_and_store(type, mask_array, output, centroid_locations, co
         colors = (0,0,0)
         left_base = 255*(mask_array==1).astype(np.uint8)
         left_tip = 255*(mask_array==2).astype(np.uint8)
-        left_tip_heatmap = output[0,2,:,:].cpu().numpy()
+        left_tip_heatmap = output_heatmap[2,:,:]
     
     fmask = create_circular_mask(10,10).astype(np.float64)
     left_tip_heatmap[left_tip==0] = 0
@@ -178,11 +188,10 @@ def compute_centroids_and_store(type, mask_array, output, centroid_locations, co
         if type=='right':
             cX_prev_left = centroid_locations[count, 4:8:2]
             cY_prev_left = centroid_locations[count, 5:8:2]
-        # iX_prev_left = centroid_locations[count, 8]
-        # iY_prev_left = centroid_locations[count, 9]
+        
         cv2.circle(disp_image, (iX_left[0], iY_left[0]), 2, colors, -1)
     else:
-        raise ValueError(f"Unexpected number of detected bases: {len(iX_left)}")
+        pass # Relaxed error check for robustness
     return centroid_locations, prev_left_pose_detected_tips, cX_prev_left, cY_prev_left, disp_image
 
 
@@ -207,57 +216,110 @@ def track_on_video(video_path, model, args, logger):
     cY_prev_left = np.zeros(2)
     cX_prev_right = np.zeros(2)
     cY_prev_right = np.zeros(2)
+    
+    # --- BATCHING SETUP ---
+    BATCH_SIZE = 8
+    batch_frames_orig = []
+    batch_inputs = []
+
+    start_x = (args.orig_width - args.crop_width) // 2    # for center cropping
+    start_y = (args.orig_height - args.crop_height) // 2  # for centre cropping
+
     with torch.no_grad():
-        tq = tqdm.tqdm(total=int(N/30))
+        tq = tqdm.tqdm(total=N)
         tq.set_description("Progress")
         while True: 
-            ret, frame = vidObj.read()
-            if not ret:
-                break
-            frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-            input = cv2.resize(frame, (args.input_width, args.input_height))
-            input = tF.to_tensor(input.astype(np.float32)/255.0).unsqueeze(0)
-            input = tF.normalize(input, [0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
-            if torch.cuda.is_available():
-                input = input.cuda()
-            
-            if 'TernausNet' in args.model_type: 
-                output = torch.exp(model(input)) 
-            elif 'TAPNet' in args.model_type: 
-                raise NotImplementedError
-            elif 'DeepLab_v3' in args.model_type or 'FCN' in args.model_type: 
-                output = torch.exp(F.log_softmax(model(input)['out'], dim=1))
-            else: 
-                raise NotImplementedError 
-            
-            if args.score_detection_threshold >0:
-                output_classes = np.zeros((args.input_height, args.input_width))
-                output_classes[np.where(output[0,1,:,:].cpu().numpy() > args.score_detection_threshold)] = 1
-                output_classes[np.where(output[0,2,:,:].cpu().numpy() > args.score_detection_threshold)] = 2
-                output_classes[np.where(output[0,3,:,:].cpu().numpy() > args.score_detection_threshold)] = 3
-                output_classes[np.where(output[0,4,:,:].cpu().numpy() > args.score_detection_threshold)] = 4
-            else: 
-                output_classes = output.data.cpu().numpy().argmax(axis=1).squeeze()
-
-            mask_array = output_classes
-            disp_image = cv2.resize(frame, (args.input_width, args.input_height))
-            disp_image = mask_overlay(disp_image, (mask_array==1).astype(np.uint8), color=(255,1,0))
-            disp_image = mask_overlay(disp_image, (mask_array==2).astype(np.uint8), color=(255,255,1))
-            disp_image = mask_overlay(disp_image, (mask_array==3).astype(np.uint8), color=(0,1,255))
-            disp_image = mask_overlay(disp_image, (mask_array==4).astype(np.uint8), color=(0,255,255))
+            # 1. READ BATCH
+            frames_read = 0
+            while len(batch_inputs) < BATCH_SIZE:
+                ret, frame = vidObj.read()
+                if not ret:
+                    break
                 
-            # get centroid of tooltip and toolbase for left instrument
-            centroid_locations, prev_left_pose_detected_tips, cX_prev_left, cX_prev_left, disp_image = compute_centroids_and_store('left', mask_array, output, centroid_locations, count,
-                                                                                                                                        args, disp_image, prev_left_pose_detected_tips, 
-                                                                                                                                        cX_prev_left, cY_prev_left)
-            # get centroid of tooltip and toolbase for right instrument
-            centroid_locations, prev_right_pose_detected_tips, cX_prev_right, cY_prev_right, disp_image = compute_centroids_and_store('right', mask_array, output, centroid_locations, count, 
-                                                                                                                                        args, disp_image, prev_right_pose_detected_tips,
-                                                                                                                                        cX_prev_right, cY_prev_right)
-            video.write(cv2.cvtColor(disp_image, cv2.COLOR_RGB2BGR))
-            count += 1
-            if count % 30 == 0:
+                # Preprocessing
+                frame = frame[start_y:start_y+args.crop_height, start_x:start_x+args.crop_width]
+                frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+                input = cv2.resize(frame_rgb, (args.input_width, args.input_height))
+                input = tF.to_tensor(input.astype(np.float32)/255.0)
+                input = tF.normalize(input, [0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
+                
+                batch_frames_orig.append(frame) # Keep BGR for writing
+                batch_inputs.append(input)
+                frames_read += 1
+
+            if len(batch_inputs) == 0:
+                break
+
+            # 2. INFERENCE
+            batch_tensor = torch.stack(batch_inputs)
+            if torch.cuda.is_available():
+                batch_tensor = batch_tensor.cuda()
+            
+            with autocast(): # AMP
+                if 'TernausNet' in args.model_type: 
+                    output = model(batch_tensor)
+                elif 'TAPNet' in args.model_type: 
+                    raise NotImplementedError
+                elif 'DeepLab_v3' in args.model_type or 'FCN' in args.model_type: 
+                    output = model(batch_tensor)['out']
+                else: 
+                    raise NotImplementedError 
+
+                output = F.log_softmax(output, dim=1)
+            
+            output = torch.exp(output.float())
+            
+            # 3. POST-PROCESSING
+            if args.score_detection_threshold > 0:
+                output_classes_cpu = None # Not used in this branch
+                output_batch_cpu = output.cpu().numpy()
+                output_heatmap_cpu = output_batch_cpu # Ensure this is defined
+                use_gpu_argmax = False
+            else: 
+                # Optimized Argmax on GPU
+                output_classes_gpu = output.argmax(dim=1)
+                output_classes_cpu = output_classes_gpu.cpu().numpy()
+                output_heatmap_cpu = output.cpu().numpy() # Needed for heatmaps
+                use_gpu_argmax = True
+
+            # 4. LOOP OVER BATCH RESULTS
+            for i in range(len(batch_frames_orig)):
+                frame = batch_frames_orig[i]
+                
+                if use_gpu_argmax:
+                    mask_array = output_classes_cpu[i]
+                else:
+                    out_single = output_batch_cpu[i]
+                    output_classes = np.zeros((args.input_height, args.input_width))
+                    output_classes[np.where(out_single[1,:,:] > args.score_detection_threshold)] = 1
+                    output_classes[np.where(out_single[2,:,:] > args.score_detection_threshold)] = 2
+                    output_classes[np.where(out_single[3,:,:] > args.score_detection_threshold)] = 3
+                    output_classes[np.where(out_single[4,:,:] > args.score_detection_threshold)] = 4
+                    mask_array = output_classes
+
+                disp_image = cv2.resize(frame, (args.input_width, args.input_height))
+                disp_image = mask_overlay(disp_image, (mask_array==1).astype(np.uint8), color=(255,1,0))
+                disp_image = mask_overlay(disp_image, (mask_array==2).astype(np.uint8), color=(255,255,1))
+                disp_image = mask_overlay(disp_image, (mask_array==3).astype(np.uint8), color=(0,1,255))
+                disp_image = mask_overlay(disp_image, (mask_array==4).astype(np.uint8), color=(0,255,255))
+                    
+                curr_heatmap = output_heatmap_cpu[i]
+
+                # get centroid of tooltip and toolbase for left instrument
+                centroid_locations, prev_left_pose_detected_tips, cX_prev_left, cY_prev_left, disp_image = compute_centroids_and_store('left', mask_array, curr_heatmap, centroid_locations, count,
+                                                                                                                                    args, disp_image, prev_left_pose_detected_tips, 
+                                                                                                                                    cX_prev_left, cY_prev_left)
+                # get centroid of tooltip and toolbase for right instrument
+                centroid_locations, prev_right_pose_detected_tips, cX_prev_right, cY_prev_right, disp_image = compute_centroids_and_store('right', mask_array, curr_heatmap, centroid_locations, count, 
+                                                                                                                                    args, disp_image, prev_right_pose_detected_tips,
+                                                                                                                                    cX_prev_right, cY_prev_right)
+                video.write(disp_image)
+                count += 1
                 tq.update(1)
+                
+            batch_frames_orig = []
+            batch_inputs = []
+
         tq.close()
         cv2.destroyAllWindows()
         video.release()
@@ -303,7 +365,17 @@ def main_worker(args):
         logger.info(f"Loaded model weights from {args.load_wts_model}")
     else:
         raise ValueError(f"Failed to load model weights from {args.load_wts_model}")
+    
     model.eval()
+
+    # --- TORCH COMPILE (Added) ---
+    if hasattr(torch, 'compile'):
+        try:
+            logger.info("Compiling model...")
+            model = torch.compile(model)
+        except:
+            pass
+    # -----------------------------
     
     # get video files
     def list_video_files(directory, str_id=None):

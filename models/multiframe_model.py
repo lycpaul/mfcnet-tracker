@@ -49,7 +49,7 @@ class MultiFrameNetBase(nn.Module):
 #         return self.multiframe_net(x)
 
 class MultiFrameNetBasic(MultiFrameNetBase):
-    def __init__(self, num_classes, num_frames, has_base_perframe_model_trained=False, with_optflow=False, with_depth=False):
+    def __init__(self, num_classes, num_frames, has_base_perframe_model_trained=False, with_optflow=False, with_depth=False, shape=(576,720)):
         super(MultiFrameNetBasic, self).__init__(num_classes, num_frames, has_base_perframe_model_trained, with_optflow, with_depth)
         self.in_channels = num_classes * num_frames
         if with_depth:
@@ -79,7 +79,7 @@ class MultiFrameNetBasic(MultiFrameNetBase):
         # )
 
         # Register the mesh grid as a buffer
-        self.register_buffer('grid', self._create_mesh_grid())
+        self.register_buffer('grid', self._create_mesh_grid(shape))
 
     def forward(self, x):
         if self.with_optflow:
@@ -169,14 +169,14 @@ class MultiFrameNetBasic(MultiFrameNetBase):
 
         return warped_map
 
-    def _create_mesh_grid(self):
+    def _create_mesh_grid(self, shape=(576,720)):
         """
         Create a mesh grid for the image dimensions, normalized to [-1, 1] for use in grid_sample.
 
         Returns:
             torch.Tensor: Mesh grid of shape (1, 2, H, W).
         """
-        H, W = 576, 720  # Default size, will be cropped/resized as needed
+        H, W = shape  # Default size, will be cropped/resized as needed
         y, x = torch.meshgrid(torch.arange(0, H), torch.arange(0, W))
         grid_y = 2.0 * y / (H - 1) - 1.0
         grid_x = 2.0 * x / (W - 1) - 1.0
@@ -205,7 +205,7 @@ class MultiFrameNetLarge(MultiFrameNetBase):
         return self.multiframe_net(x)
 
 class TernausNetMultiBasic(nn.Module):
-    def __init__(self, num_classes, num_frames, pretrained=True, loadpath=None, optflow_inputs=False, depth_inputs=False): 
+    def __init__(self, num_classes, num_frames, pretrained=True, loadpath=None, optflow_inputs=False, depth_inputs=False, shape=(576,720)): 
         super(TernausNetMultiBasic, self).__init__()
         self.num_classes = num_classes
         self.num_frames = num_frames
@@ -219,7 +219,7 @@ class TernausNetMultiBasic(nn.Module):
             self.base_model = TernausNet16(num_classes=1*self.num_classes, num_filters=64, pretrained=self.pretrained)
             has_base_preframe_model_trained = False
         self.multiframe_net = MultiFrameNetBasic(self.num_classes, self.num_frames, has_base_preframe_model_trained,
-                                            with_optflow=self.optflow_inputs, with_depth=self.depth_inputs)
+                                            with_optflow=self.optflow_inputs, with_depth=self.depth_inputs, shape=shape)
     
     def forward(self, x, optflow=None, depth=None):
         y_output = []
@@ -271,7 +271,7 @@ class TernausNetMultiLarge(nn.Module):
         return y_output
 
 class DeepLabMultiBasic(nn.Module):
-    def __init__(self, num_classes=2, num_frames=1, pretrained=True, loadpath=None, optflow_inputs=False, depth_inputs=False):
+    def __init__(self, num_classes=2, num_frames=1, pretrained=True, loadpath=None, optflow_inputs=False, depth_inputs=False, shape=(576,720)):
         super(DeepLabMultiBasic, self).__init__()
         self.num_classes = num_classes
         self.num_frames = num_frames
@@ -286,7 +286,7 @@ class DeepLabMultiBasic(nn.Module):
             self.base_model.classifier = DeepLabHead(2048, 1*self.num_classes)
             has_base_preframe_model_trained = False
         self.multiframe_net = MultiFrameNetBasic(self.num_classes, self.num_frames, has_base_preframe_model_trained, 
-                                            with_optflow=self.optflow_inputs, with_depth=self.depth_inputs)
+                                            with_optflow=self.optflow_inputs, with_depth=self.depth_inputs, shape=shape)
 
     def forward(self, x, optflow=None, depth=None): 
         y_output = []
@@ -340,7 +340,7 @@ class DeepLabMultiLarge(nn.Module):
 
 
 class SegFormerMultiBasic(nn.Module):
-    def __init__(self, num_classes=2, num_frames=1, pretrained=True, loadpath=None, optflow_inputs=False, depth_inputs=False):
+    def __init__(self, num_classes=2, num_frames=1, pretrained=True, loadpath=None, optflow_inputs=False, depth_inputs=False, shape=(576,720)):
         super(SegFormerMultiBasic, self).__init__()
         self.num_classes = num_classes
         self.num_frames = num_frames
@@ -353,7 +353,7 @@ class SegFormerMultiBasic(nn.Module):
         else:
             has_base_preframe_model_trained = False
         self.multiframe_net = MultiFrameNetBasic(self.num_classes, self.num_frames, has_base_preframe_model_trained, 
-                                            with_optflow=self.optflow_inputs, with_depth=self.depth_inputs)
+                                            with_optflow=self.optflow_inputs, with_depth=self.depth_inputs, shape=shape)
 
     def forward(self, x, optflow=None, depth=None): 
         y_output = []
@@ -406,7 +406,7 @@ class SegFormerMultiLarge(nn.Module):
 
 
 class HRNetMultiBasic(nn.Module):
-    def __init__(self, num_classes=2, num_frames=1, pretrained=True, loadpath=None, optflow_inputs=False, depth_inputs=False): 
+    def __init__(self, num_classes=2, num_frames=1, pretrained=True, loadpath=None, optflow_inputs=False, depth_inputs=False, shape=(576,720)): 
         super(HRNetMultiBasic, self).__init__()
         self.num_classes = num_classes
         self.num_frames = num_frames
@@ -419,7 +419,7 @@ class HRNetMultiBasic(nn.Module):
         else:
             has_base_preframe_model_trained = False
         self.multiframe_net = MultiFrameNetBasic(self.num_classes, self.num_frames, has_base_preframe_model_trained,
-                                            with_optflow=self.optflow_inputs, with_depth=self.depth_inputs)
+                                            with_optflow=self.optflow_inputs, with_depth=self.depth_inputs, shape=shape)
     
     def forward(self, x, optflow=None, depth=None):
         y_output = []
@@ -472,7 +472,7 @@ class HRNetMultiLarge(nn.Module):
 
 
 class FCNMultiBasic(nn.Module): 
-    def __init__(self, num_classes=2, num_frames=1, pretrained=True, loadpath=None, optflow_inputs=False, depth_inputs=False): 
+    def __init__(self, num_classes=2, num_frames=1, pretrained=True, loadpath=None, optflow_inputs=False, depth_inputs=False, shape=(576,720)): 
         super(FCNMultiBasic, self).__init__()
         self.num_classes = num_classes 
         self.num_frames = num_frames 
@@ -487,7 +487,7 @@ class FCNMultiBasic(nn.Module):
             self.base_model.classifier = FCNHead(2048, 1*self.num_classes)
             has_base_preframe_model_trained = False
         self.multiframe_net = MultiFrameNetBasic(self.num_classes, self.num_frames, has_base_preframe_model_trained, 
-                                            with_optflow=self.optflow_inputs, with_depth=self.depth_inputs) 
+                                            with_optflow=self.optflow_inputs, with_depth=self.depth_inputs, shape=shape) 
     
     def forward(self, x, optflow=None, depth=None):
         y_output = [] 

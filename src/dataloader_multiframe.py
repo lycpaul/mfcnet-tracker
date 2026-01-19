@@ -11,6 +11,7 @@ from torchvision import transforms
 import torchvision.transforms.functional as tF
 
 from utils.dataloader_utils import get_MICCAI2015_dataset_filenames, get_MICCAI2017_dataset_filenames, get_JIGSAWS_dataset_filenames
+from utils.dataloader_utils import get_custom_dataset_filenames
 
 class to_tensor(object): 
     def __call__(self, sample): 
@@ -282,6 +283,38 @@ def get_data_loader(args):
             test_loader = DataLoader(test_dataset, batch_size=1, shuffle=False, 
                                     num_workers=args.num_workers, pin_memory=True)
             return None, test_loader
+    elif args.dataset == 'custom':
+        if args.mode == 'training':
+            train_file_names, val_file_names = get_custom_dataset_filenames(args)
+            train_transform = get_transform('train', args)
+            val_transform = get_transform('val', args)
+            train_dataset = JIGSAWS(train_file_names, train_transform,
+                                    mode=args.mode, prediction_task=args.prediction_task,
+                                    num_input_frames=args.num_input_frames,
+                                    num_frames_per_video=args.num_frames_per_video, 
+                                    add_depth_inputs=args.add_depth_inputs)
+            val_dataset = JIGSAWS(val_file_names, val_transform,
+                                    mode=args.mode, prediction_task=args.prediction_task,
+                                    num_input_frames=args.num_input_frames,
+                                    num_frames_per_video=args.num_frames_per_video, 
+                                    add_depth_inputs=args.add_depth_inputs)
+            train_loader = DataLoader(train_dataset, batch_size=args.batch_size,
+                                    shuffle=True, num_workers=args.num_workers, pin_memory=True)
+            val_loader = DataLoader(val_dataset, batch_size=1, shuffle=False,
+                                    num_workers=args.num_workers, pin_memory=True)
+            return train_loader, val_loader
+        else:
+            test_file_names, _ = get_custom_dataset_filenames(args)
+            test_transform = get_transform('test', args)
+            test_dataset = JIGSAWS(test_file_names, test_transform, 
+                                      mode=args.mode, prediction_task=args.prediction_task,
+                                     num_input_frames=args.num_input_frames, 
+                                     num_frames_per_video=args.num_frames_per_video, 
+                                     add_depth_inputs=args.add_depth_inputs)
+            test_loader = DataLoader(test_dataset, batch_size=1, shuffle=False, 
+                                    num_workers=args.num_workers, pin_memory=True)
+            return None, test_loader
+
     elif args.dataset == 'JIGSAWS': 
         if args.mode == 'training':
             train_file_names, val_file_names = get_JIGSAWS_dataset_filenames(args)
@@ -322,18 +355,33 @@ if __name__=="__main__":
     import matplotlib.pyplot as plt
 
     # Create a SimpleNamespace object
+    # args = SimpleNamespace(
+    #     data_dir=Path('/shared/bg40/surgical_video_datasets/miccai2015/'),
+    #     dataset='MICCAI2015', 
+    #     input_height=480,
+    #     input_width=640,
+    #     mode='training',
+    #     prediction_task='endovis15_segmentation',
+    #     num_input_frames=3,
+    #     num_frames_per_video=225,
+    #     batch_size=1,
+    #     num_workers=1,
+    #     add_depth_inputs=False
+    #     )
+
+    # Create a SimpleNamespace object
     args = SimpleNamespace(
-        data_dir=Path('/shared/bg40/surgical_video_datasets/miccai2015/'),
-        dataset='MICCAI2015', 
-        input_height=480,
-        input_width=640,
+        data_dir=Path('/rhf/bg40/Rice-Methodist-Surgical-Skills-Assessement-Data-2025/annotated_dataset_for_toolpose/'),
+        dataset='custom', 
+        input_height=1080,
+        input_width=1440,
         mode='training',
-        prediction_task='endovis15_segmentation',
+        prediction_task='toolpose_segmentation',
         num_input_frames=3,
         num_frames_per_video=225,
         batch_size=1,
         num_workers=1,
-        add_depth_inputs=False
+        add_depth_inputs=True
         )
 
     train_loader, val_loader = get_data_loader(args)
@@ -373,6 +421,16 @@ if __name__=="__main__":
         plt.imshow(mask_vis)
         plt.title("Mask", fontsize=14)
         plt.axis('off')
+        # Plot the depth maps if available
+        if 'input_depth' in sample:
+            plt.subplot(2, 3, 5)
+            plt.imshow(sample['input_depth'][1][0].squeeze().numpy(), cmap='gray')
+            plt.title("Depth map 2", fontsize=14)
+            plt.axis('off')
+            plt.subplot(2, 3, 6)
+            plt.imshow(sample['input_depth'][2][0].squeeze().numpy(), cmap='gray')
+            plt.title("Depth map 3", fontsize=14)
+            plt.axis('off')
         # Adjust layout and save with reduced margins
         plt.tight_layout(pad=0, h_pad=0.5, w_pad=0.5)  # Reduce padding between subplots
         plt.savefig('sample_{:03d}.png'.format(i), bbox_inches='tight')  # Save without excess white space

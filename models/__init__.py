@@ -54,31 +54,31 @@ def get_tooltip_segmentation_model(args):
 def get_multiframe_segmentation_model(args):
     if args.model_type == 'TernausNetMulti-Basic':
         model = TernausNetMultiBasic(num_classes=args.num_classes, num_frames=args.num_input_frames, pretrained=args.pretrained, loadpath=args.load_wts_base_model,  
-                         optflow_inputs=args.add_optflow_inputs, depth_inputs=args.add_depth_inputs)
+                         optflow_inputs=args.add_optflow_inputs, depth_inputs=args.add_depth_inputs, shape=(args.input_height, args.input_width))
     elif args.model_type == 'TernausNetMulti-Large':
         model = TernausNetMultiLarge(num_classes=args.num_classes, num_frames=args.num_input_frames, pretrained=args.pretrained, loadpath=args.load_wts_base_model,  
                          optflow_inputs=args.add_optflow_inputs, depth_inputs=args.add_depth_inputs)
     elif args.model_type == 'DeepLabMulti-Basic':
         model = DeepLabMultiBasic(num_classes=args.num_classes, num_frames=args.num_input_frames, pretrained=args.pretrained, loadpath=args.load_wts_base_model,  
-                         optflow_inputs=args.add_optflow_inputs, depth_inputs=args.add_depth_inputs)
+                         optflow_inputs=args.add_optflow_inputs, depth_inputs=args.add_depth_inputs, shape=(args.input_height, args.input_width))
     elif args.model_type == 'DeepLabMulti-Large':
         model = DeepLabMultiLarge(num_classes=args.num_classes, num_frames=args.num_input_frames, pretrained=args.pretrained, loadpath=args.load_wts_base_model,  
                          optflow_inputs=args.add_optflow_inputs, depth_inputs=args.add_depth_inputs)
     elif args.model_type == 'FCNMulti-Basic': 
         model = FCNMultiBasic(num_classes=args.num_classes, num_frames=args.num_input_frames, pretrained=args.pretrained, loadpath=args.load_wts_base_model,  
-                         optflow_inputs=args.add_optflow_inputs, depth_inputs=args.add_depth_inputs)
+                         optflow_inputs=args.add_optflow_inputs, depth_inputs=args.add_depth_inputs, shape=(args.input_height, args.input_width))
     elif args.model_type == 'FCNMulti-Large':    
         model = FCNMultiLarge(num_classes=args.num_classes, num_frames=args.num_input_frames, pretrained=args.pretrained, loadpath=args.load_wts_base_model,  
                          optflow_inputs=args.add_optflow_inputs, depth_inputs=args.add_depth_inputs)
     elif args.model_type == 'SegFormerMulti-Basic':
         model = SegFormerMultiBasic(num_classes=args.num_classes, num_frames=args.num_input_frames, pretrained=args.pretrained, loadpath=args.load_wts_base_model,  
-                         optflow_inputs=args.add_optflow_inputs, depth_inputs=args.add_depth_inputs)
+                         optflow_inputs=args.add_optflow_inputs, depth_inputs=args.add_depth_inputs, shape=(args.input_height, args.input_width))
     elif args.model_type == 'SegFormerMulti-Large':
         model = SegFormerMultiLarge(num_classes=args.num_classes, num_frames=args.num_input_frames, pretrained=args.pretrained, loadpath=args.load_wts_base_model,  
                          optflow_inputs=args.add_optflow_inputs, depth_inputs=args.add_depth_inputs)
     elif args.model_type == 'HRNetMulti-Basic':
         model = HRNetMultiBasic(num_classes=args.num_classes, num_frames=args.num_input_frames, pretrained=args.pretrained, loadpath=args.load_wts_base_model,
-                                optflow_inputs=args.add_optflow_inputs, depth_inputs=args.add_depth_inputs)
+                                optflow_inputs=args.add_optflow_inputs, depth_inputs=args.add_depth_inputs, shape=(args.input_height, args.input_width))
     elif args.model_type == 'HRNetMulti-Large':
         model = HRNetMultiLarge(num_classes=args.num_classes, num_frames=args.num_input_frames, pretrained=args.pretrained, loadpath=args.load_wts_base_model,
                                 optflow_inputs=args.add_optflow_inputs, depth_inputs=args.add_depth_inputs)

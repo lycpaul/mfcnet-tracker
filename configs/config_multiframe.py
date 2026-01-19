@@ -6,7 +6,7 @@ def train_config_parser(parser):
     # dataset related arguments
     parser.add_argument('--data_dir', type=str, default='/home/bg40/surgical_video_datasets/miccai2017/', 
                         help='Path to data directory. Default: /home/bg40/surgical_video_datasets/miccai2017/')
-    parser.add_argument('--dataset', type=str, default='MICCAI2017', choices=['MICCAI2015', 'MICCAI2017', 'JIGSAWS'],
+    parser.add_argument('--dataset', type=str, default='MICCAI2017', choices=['MICCAI2015', 'MICCAI2017', 'JIGSAWS', 'custom'],
                         help='Dataset name. Default: MICCAI2017')
     parser.add_argument('--fold_index', type=int, default=-1, choices=[-1,0,1,2,3], 
                         help='Fold index for cross validation. Default: -1, no cross validation')
@@ -80,7 +80,7 @@ def test_config_parser(parser):
     # dataset related arguments
     parser.add_argument('--data_dir', type=str, default='/home/bg40/surgical_video_datasets/miccai2017/', 
                         help='Path to data directory. Default: /home/bg40/surgical_video_datasets/miccai2017/')
-    parser.add_argument('--dataset', type=str, default='MICCAI2017', choices=['MICCAI2015', 'MICCAI2017', 'JIGSAWS'],
+    parser.add_argument('--dataset', type=str, default='MICCAI2017', choices=['MICCAI2015', 'MICCAI2017', 'JIGSAWS', 'custom'],
                         help='Dataset name. Default: MICCAI2017')
     parser.add_argument('--prediction_task', type=str, default='toolpose_segmentation', 
                         choices=['tooltip_segmentation', 'toolpose_segmentation', 'endovis15_segmentation', 'binary'], 

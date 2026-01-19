@@ -16,6 +16,7 @@ sys.path.append('../utils/')
 from utils.dataloader_utils import load_image, load_mask, load_attmap, load_optflow_map
 from utils.dataloader_utils import to_tensor, customHorzFlip_LR, customVertFlip, customNormalize, customResize, customRandomRotation, customRandomHSVDistortion
 from utils.dataloader_utils import get_MICCAI2017_dataset_filenames, get_JIGSAWS_dataset_filenames, get_MICCAI2015_dataset_filenames
+from utils.dataloader_utils import get_custom_dataset_filenames
 
 class RoboticSurgeryFramesDataset_withoptflow(Dataset):
     def __init__(self, file_names, optflow_dir, transform=None, 
@@ -243,6 +244,43 @@ def get_data_loader(args):
             else:
                 raise NotImplementedError
             return None, test_loader
+    if args.dataset == 'custom': 
+        if args.mode=='training':
+            # import pdb; pdb.set_trace()
+            train_file_names, val_file_names = get_custom_dataset_filenames(args)
+            if not args.add_optflow_inputs:
+                train_transform = get_transform('train', args)
+                val_transform = get_transform('val', args)
+                # import pdb; pdb.set_trace()
+                train_dataset = RoboticSurgeryFramesDataset(train_file_names, transform=train_transform, mode=args.mode, prediction_task=args.prediction_task)
+                train_loader = DataLoader(train_dataset, batch_size=args.batch_size, shuffle=True, num_workers=args.num_workers, pin_memory=True, drop_last=True)
+                val_dataset = RoboticSurgeryFramesDataset(val_file_names, transform=val_transform, mode=args.mode, prediction_task=args.prediction_task)
+                val_loader = DataLoader(val_dataset, batch_size=1, shuffle=False, num_workers=args.num_workers, pin_memory=True)
+                # import pdb; pdb.set_trace()
+            else: 
+                assert 'TAPNet' in args.model_type
+                train_transform = get_transform('train', args)
+                val_transform = get_transform('val', args)
+                # train_transform = transforms.Compose([to_tensor(), customResize(), customVertFlip(), customRandomRotation(), customRandomHSVDistortion(), customNormalize()])
+                # val_transform = transforms.Compose([to_tensor(), customResize(), customNormalize()])
+                train_dataset = RoboticSurgeryFramesDataset_withoptflow(train_file_names, args.optflow_dir, transform=train_transform, mode=args.mode, prediction_task=args.prediction_task, num_frames=args.num_frames_per_video)
+                train_loader = DataLoader(train_dataset, batch_size=args.batch_size, shuffle=True, num_workers=args.num_workers, pin_memory=True)
+                val_dataset = RoboticSurgeryFramesDataset_withoptflow(val_file_names, args.optflow_dir, transform=val_transform, mode=args.mode, prediction_task=args.prediction_task, num_frames=args.num_frames_per_video)
+                val_loader = DataLoader(val_dataset, batch_size=1, shuffle=False, num_workers=args.num_workers, pin_memory=True)
+            return train_loader, val_loader
+        if args.mode=='testing':
+            test_file_names, _ = get_custom_dataset_filenames(args)
+            if not args.add_optflow_inputs:
+                test_transform = get_transform('test', args)
+                test_dataset = RoboticSurgeryFramesDataset(test_file_names, transform=test_transform, mode=args.mode, prediction_task=args.prediction_task)
+                test_loader = DataLoader(test_dataset, batch_size=1, shuffle=False, num_workers=args.num_workers, pin_memory=True)
+            else: 
+                assert 'TAPNet' in args.model_type
+                test_transform = get_transform('test', args)
+                # test_transform = transforms.Compose([to_tensor(), customNormalize()])
+                test_dataset = RoboticSurgeryFramesDataset_withoptflow(test_file_names, args.optflow_dir, transform=test_transform, mode=args.mode, prediction_task=args.prediction_task, num_frames=args.num_frames_per_video)
+                test_loader = DataLoader(test_dataset, batch_size=1, shuffle=False, num_workers=args.num_workers, pin_memory=True)
+            return None, test_loader
     if args.dataset == 'JIGSAWS': 
         if args.mode=='training':
             train_file_names, val_file_names = get_JIGSAWS_dataset_filenames(args)
@@ -286,17 +324,30 @@ if __name__ == '__main__':
     import matplotlib.pyplot as plt 
 
     args = SimpleNamespace(
-        data_dir = Path('/shared/bg40/surgical_video_datasets/miccai2015'), 
-        dataset = 'MICCAI2015', 
-        input_height = 576,
-        input_width = 720,
+        data_dir = Path('/rhf/bg40/Rice-Methodist-Surgical-Skills-Assessement-Data-2025/annotated_dataset_for_toolpose/'), 
+        dataset = 'custom', 
+        input_height = 1080,
+        input_width = 1440,
         mode = 'training',
-        prediction_task = 'endovis15_segmentation',
+        prediction_task = 'toolpose_segmentation',
         batch_size = 1, 
         num_workers = 1,
         add_depth_inputs = False, 
         add_optflow_inputs = False
     )
+
+    # args = SimpleNamespace(
+    #     data_dir = Path('/shared/bg40/surgical_video_datasets/miccai2015'), 
+    #     dataset = 'MICCAI2015', 
+    #     input_height = 576,
+    #     input_width = 720,
+    #     mode = 'training',
+    #     prediction_task = 'endovis15_segmentation',
+    #     batch_size = 1, 
+    #     num_workers = 1,
+    #     add_depth_inputs = False, 
+    #     add_optflow_inputs = False
+    # )
 
     train_loader, val_loader = get_data_loader(args)
     print("Train loader length: ", len(train_loader))
@@ -317,7 +368,7 @@ if __name__ == '__main__':
         mask_vis = np.zeros((mask.shape[0], mask.shape[1], 3))
         mask_vis[mask == 1] = [0, 63, 0]
         mask_vis[mask == 2] = [0, 127, 0]
-        mask_vis[mask == 3] = [0, 255, 0]
+        mask_vis[mask == 3] = [0, 255, 255]
         mask_vis[mask == 4] = [255, 0, 0]
         mask_vis[mask == 5] = [0, 0, 255]
         mask_vis[mask == 6] = [0, 63, 0]
