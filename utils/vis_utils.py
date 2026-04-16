@@ -41,15 +41,23 @@ def draw_plus(image, center, color=(0, 255, 0), size=5, thickness=1):
     cv2.line(image, (center[0] - size, center[1]), (center[0] + size, center[1]), color, thickness)
     return image
 
+def draw_circle(image, center, color=(0, 255, 0), radius=5, thickness=1):
+    """
+    Draws a circle at the specified center on the image.
+    """
+    cv2.circle(image, center, radius, color, thickness)
+    return image
+
 def mask_overlay(image, mask, color=(0, 255, 0), wt=0.5):
     """
     Helper function to visualize mask on the top of the car
     """
+    ind = mask > 0
     mask = np.dstack((mask, mask, mask)) * np.array(color)
     mask = mask.astype(np.uint8)
     weighted_sum = cv2.addWeighted(mask, wt, image, 1-wt, 0.0)
     img = image.copy() 
-    ind = mask[:,:,1] > 0 
+    # ind = mask[:,:,1] > 0 
     img[ind] = weighted_sum[ind]
     return img
 

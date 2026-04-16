@@ -20,6 +20,7 @@ def get_loss(outputs, targets, loss_fns, loss_wts, args):
     loss_dict['loss_total'] = total_loss.item()
     return total_loss, loss_dict
 
+
 class LossMSE:
     def __init__(self):
         self.mse_loss = nn.MSELoss()

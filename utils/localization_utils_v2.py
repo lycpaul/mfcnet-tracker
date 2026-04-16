@@ -39,6 +39,48 @@ def determine_local_maxima_and_estimate_centroids(heatmap, blob, mask):
     c_x, c_y = calc_centroids(255*localization.astype(np.uint8))
     return c_x, c_y
 
+def centroid_error_5_classes(output, gt):
+    mask = create_circular_mask(10,10).astype(np.float64)
+    pred_classes = output.data.cpu().numpy().argmax(axis=1).squeeze()
+    c_pred = []
+    c_gt = []
+    p_gt_kpt = []
+    p_kpt = []
+    err_kpt = []
+    for i in range(1, 6):
+        kpt = pred_classes==i
+        heatmap = output[0,i,:,:].cpu().numpy()
+        c_x, c_y = determine_local_maxima_and_estimate_centroids(heatmap, kpt, mask)
+        gt_kpt = gt.cpu().numpy().squeeze() == i
+        gt_heatmap = (gt_kpt).astype(np.float32)
+        c_gt_x, c_gt_y = determine_local_maxima_and_estimate_centroids(gt_heatmap, gt_kpt, mask)
+        if len(c_gt_x) == 0:
+            c_gt_x = [np.nan, np.nan]
+            c_gt_y = [np.nan, np.nan]
+        elif len(c_gt_x) == 1:
+            c_gt_x.append(c_gt_x[0])
+            c_gt_y.append(c_gt_y[0])
+        if len(c_x) == 0:
+            c_x = [np.nan, np.nan]
+            c_y = [np.nan, np.nan]  
+        elif len(c_x) == 1:
+            c_x.append(c_x[0])
+            c_y.append(c_y[0])
+        c_gt.append(c_gt_x)
+        c_gt.append(c_gt_y)
+        c_pred.append(c_x)
+        c_pred.append(c_y)
+
+        p_gt_kpt.append(not np.isnan(c_gt_x[0]))
+        p_kpt.append(not np.isnan(c_x[0]))
+
+        err = np.minimum((np.sqrt((c_x[0] - c_gt_x[0])**2 + (c_y[0] - c_gt_y[0])**2) + np.sqrt((c_x[1] - c_gt_x[1])**2 + (c_y[1] - c_gt_y[1])**2))/2 ,
+                        (np.sqrt((c_x[0] - c_gt_x[1])**2 + (c_y[0] - c_gt_y[1])**2) + np.sqrt((c_x[1] - c_gt_x[0])**2 + (c_y[1] - c_gt_y[0])**2))/2)
+        err_kpt.append(err)
+    return err_kpt, p_gt_kpt, p_kpt, c_gt, c_pred
+        
+        
+
 def centroid_error_3_classes(output, gt):
     mask = create_circular_mask(10,10).astype(np.float64)
     pred_classes = output.data.cpu().numpy().argmax(axis=1).squeeze()
@@ -190,100 +232,105 @@ def centroid_error_10_classes(output, gt):
     err = [err_r1, err_r2, err_r3, err_r4, err_r5, err_l1, err_l2, err_l3, err_l4, err_l5]
     return err, p_gt, p, c_gt, c_pred
 
+
 def centroid_error(output, gt, args): 
-    if args.num_classes != 5:
+    if args.num_classes < 5:
         if args.num_classes == 3:
             err_rc, err_lc, p_gt, p, c_gt, c_pred = centroid_error_3_classes(output, gt)
             return err_rc, err_lc, p_gt, p, c_gt, c_pred
         else: 
             raise ValueError('Centroid error can only be computed for 5 classes')
-    mask = create_circular_mask(10,10).astype(np.float64)
-    pred_classes = output.data.cpu().numpy().argmax(axis=1).squeeze()
-    left_base = pred_classes==3
-    c_lb_x, c_lb_y = calc_centroids(255*left_base.astype(np.uint8))
-    left_tip = pred_classes==4
-    left_tip_heatmap = output[0,4,:,:].cpu().numpy()
-    c_lt_x, c_lt_y = determine_local_maxima_and_estimate_centroids(left_tip_heatmap, left_tip, mask)
-    right_base = pred_classes==1
-    c_rb_x, c_rb_y = calc_centroids(255*right_base.astype(np.uint8))
-    right_tip = pred_classes==2
-    right_tip_heatmap = output[0,2,:,:].cpu().numpy()
-    c_rt_x, c_rt_y = determine_local_maxima_and_estimate_centroids(right_tip_heatmap, right_tip, mask)
+    elif args.num_classes == 6:
+        err_kpt, p_gt_kpt, p_kpt, c_gt, c_pred = centroid_error_5_classes(output, gt)
+        return err_kpt, p_gt_kpt, p_kpt, c_gt, c_pred
+    elif args.num_classes == 5:
+        mask = create_circular_mask(10,10).astype(np.float64)
+        pred_classes = output.data.cpu().numpy().argmax(axis=1).squeeze()
+        left_base = pred_classes==3
+        c_lb_x, c_lb_y = calc_centroids(255*left_base.astype(np.uint8))
+        left_tip = pred_classes==4
+        left_tip_heatmap = output[0,4,:,:].cpu().numpy()
+        c_lt_x, c_lt_y = determine_local_maxima_and_estimate_centroids(left_tip_heatmap, left_tip, mask)
+        right_base = pred_classes==1
+        c_rb_x, c_rb_y = calc_centroids(255*right_base.astype(np.uint8))
+        right_tip = pred_classes==2
+        right_tip_heatmap = output[0,2,:,:].cpu().numpy()
+        c_rt_x, c_rt_y = determine_local_maxima_and_estimate_centroids(right_tip_heatmap, right_tip, mask)
 
-    # print("Pred: ", c_lb_x, c_lb_y, c_lt_x, c_lt_y, c_rb_x, c_rb_y, c_rt_x, c_rt_y)
+        # print("Pred: ", c_lb_x, c_lb_y, c_lt_x, c_lt_y, c_rb_x, c_rb_y, c_rt_x, c_rt_y)
 
-    gt_classes = gt.cpu().numpy().squeeze()
-    gt_left_base = gt_classes==3
-    c_gt_lb_x, c_gt_lb_y = calc_centroids(255*gt_left_base.astype(np.uint8))
-    gt_left_tip = gt_classes==4
-    gt_left_tip_heatmap = (gt_classes==4).astype(np.float32)
-    c_gt_lt_x, c_gt_lt_y = determine_local_maxima_and_estimate_centroids(gt_left_tip_heatmap, gt_left_tip, mask)
-    gt_right_base = gt_classes==1
-    c_gt_rb_x, c_gt_rb_y = calc_centroids(255*gt_right_base.astype(np.uint8))
-    gt_right_tip = gt_classes==2
-    gt_right_tip_heatmap = (gt_classes==2).astype(np.float32)
-    c_gt_rt_x, c_gt_rt_y = determine_local_maxima_and_estimate_centroids(gt_right_tip_heatmap, gt_right_tip, mask)
+        gt_classes = gt.cpu().numpy().squeeze()
+        gt_left_base = gt_classes==3
+        c_gt_lb_x, c_gt_lb_y = calc_centroids(255*gt_left_base.astype(np.uint8))
+        gt_left_tip = gt_classes==4
+        gt_left_tip_heatmap = (gt_classes==4).astype(np.float32)
+        c_gt_lt_x, c_gt_lt_y = determine_local_maxima_and_estimate_centroids(gt_left_tip_heatmap, gt_left_tip, mask)
+        gt_right_base = gt_classes==1
+        c_gt_rb_x, c_gt_rb_y = calc_centroids(255*gt_right_base.astype(np.uint8))
+        gt_right_tip = gt_classes==2
+        gt_right_tip_heatmap = (gt_classes==2).astype(np.float32)
+        c_gt_rt_x, c_gt_rt_y = determine_local_maxima_and_estimate_centroids(gt_right_tip_heatmap, gt_right_tip, mask)
 
-    # print("GT: ", c_gt_lb_x, c_gt_lb_y, c_gt_lt_x, c_gt_lt_y, c_gt_rb_x, c_gt_rb_y, c_gt_rt_x, c_gt_rt_y)
+        # print("GT: ", c_gt_lb_x, c_gt_lb_y, c_gt_lt_x, c_gt_lt_y, c_gt_rb_x, c_gt_rb_y, c_gt_rt_x, c_gt_rt_y)
 
 
-    if len(c_gt_lt_x) == 0:
-        c_gt_lt_x = [np.nan, np.nan]
-        c_gt_lt_y = [np.nan, np.nan]
-    elif len(c_gt_lt_x) == 1:
-        c_gt_lt_x.append(c_gt_lt_x[0])
-        c_gt_lt_y.append(c_gt_lt_y[0])
-    if len(c_gt_lb_x) == 0:
-        c_gt_lb_x = [np.nan]
-        c_gt_lb_y = [np.nan]
-    if len(c_gt_rt_x) == 0:
-        c_gt_rt_x = [np.nan, np.nan]
-        c_gt_rt_y = [np.nan, np.nan]
-    elif len(c_gt_rt_x) == 1:
-        c_gt_rt_x.append(c_gt_rt_x[0])
-        c_gt_rt_y.append(c_gt_rt_y[0])
-    if len(c_gt_rb_x) == 0:
-        c_gt_rb_x = [np.nan]
-        c_gt_rb_y = [np.nan]
-    
-    if len(c_lt_x) == 0:
-        c_lt_x = [np.nan, np.nan]
-        c_lt_y = [np.nan, np.nan]
-    elif len(c_lt_x) == 1:
-        c_lt_x.append(c_lt_x[0])
-        c_lt_y.append(c_lt_y[0])
-    if len(c_lb_x) == 0:
-        c_lb_x = [np.nan]
-        c_lb_y = [np.nan]
-    
-    if len(c_rt_x) == 0:
-        c_rt_x = [np.nan, np.nan]
-        c_rt_y = [np.nan, np.nan]
-    elif len(c_rt_x) == 1:
-        c_rt_x.append(c_rt_x[0])
-        c_rt_y.append(c_rt_y[0])
-    if len(c_rb_x) == 0:
-        c_rb_x = [np.nan]
-        c_rb_y = [np.nan]
-    
-    c_gt = [c_gt_rt_x, c_gt_rt_y, c_gt_rb_x, c_gt_rb_y, c_gt_lt_x, c_gt_lt_y, c_gt_lb_x, c_gt_lb_y]
-    c_pred = [c_rt_x, c_rt_y, c_rb_x, c_rb_y, c_lt_x, c_lt_y, c_lb_x, c_lb_y]
+        if len(c_gt_lt_x) == 0:
+            c_gt_lt_x = [np.nan, np.nan]
+            c_gt_lt_y = [np.nan, np.nan]
+        elif len(c_gt_lt_x) == 1:
+            c_gt_lt_x.append(c_gt_lt_x[0])
+            c_gt_lt_y.append(c_gt_lt_y[0])
+        if len(c_gt_lb_x) == 0:
+            c_gt_lb_x = [np.nan]
+            c_gt_lb_y = [np.nan]
+        if len(c_gt_rt_x) == 0:
+            c_gt_rt_x = [np.nan, np.nan]
+            c_gt_rt_y = [np.nan, np.nan]
+        elif len(c_gt_rt_x) == 1:
+            c_gt_rt_x.append(c_gt_rt_x[0])
+            c_gt_rt_y.append(c_gt_rt_y[0])
+        if len(c_gt_rb_x) == 0:
+            c_gt_rb_x = [np.nan]
+            c_gt_rb_y = [np.nan]
+        
+        if len(c_lt_x) == 0:
+            c_lt_x = [np.nan, np.nan]
+            c_lt_y = [np.nan, np.nan]
+        elif len(c_lt_x) == 1:
+            c_lt_x.append(c_lt_x[0])
+            c_lt_y.append(c_lt_y[0])
+        if len(c_lb_x) == 0:
+            c_lb_x = [np.nan]
+            c_lb_y = [np.nan]
+        
+        if len(c_rt_x) == 0:
+            c_rt_x = [np.nan, np.nan]
+            c_rt_y = [np.nan, np.nan]
+        elif len(c_rt_x) == 1:
+            c_rt_x.append(c_rt_x[0])
+            c_rt_y.append(c_rt_y[0])
+        if len(c_rb_x) == 0:
+            c_rb_x = [np.nan]
+            c_rb_y = [np.nan]
+        
+        c_gt = [c_gt_rt_x, c_gt_rt_y, c_gt_rb_x, c_gt_rb_y, c_gt_lt_x, c_gt_lt_y, c_gt_lb_x, c_gt_lb_y]
+        c_pred = [c_rt_x, c_rt_y, c_rb_x, c_rb_y, c_lt_x, c_lt_y, c_lb_x, c_lb_y]
 
-    p_gt_rc = not np.isnan(c_gt_rt_x[0])
-    p_gt_rb = not np.isnan(c_gt_rb_x[0])
-    p_gt_lc = not np.isnan(c_gt_lt_x[0])
-    p_gt_lb = not np.isnan(c_gt_lb_x[0])
-    p_gt = [p_gt_rc, p_gt_rb, p_gt_lc, p_gt_lb]
-    p_rc = not np.isnan(c_rt_x[0])
-    p_rb = not np.isnan(c_rb_x[0])
-    p_lc = not np.isnan(c_lt_x[0])
-    p_lb = not np.isnan(c_lb_x[0])
-    p = [p_rc, p_rb, p_lc, p_lb]
-    err_rc = np.minimum((np.sqrt((c_rt_x[0] - c_gt_rt_x[0])**2 + (c_rt_y[0] - c_gt_rt_y[0])**2) + np.sqrt((c_rt_x[1] - c_gt_rt_x[1])**2 + (c_rt_y[1] - c_gt_rt_y[1])**2))/2 , 
-                        (np.sqrt((c_rt_x[0] - c_gt_rt_x[1])**2 + (c_rt_y[0] - c_gt_rt_y[1])**2) + np.sqrt((c_rt_x[1] - c_gt_rt_x[0])**2 + (c_rt_y[1] - c_gt_rt_y[0])**2))/2)
-    err_rb = (np.sqrt((c_rb_x[0] - c_gt_rb_x[0])**2 + (c_rb_y[0] - c_gt_rb_y[0])**2)*2)/2
-    err_lc = np.minimum((np.sqrt((c_lt_x[0] - c_gt_lt_x[0])**2 + (c_lt_y[0] - c_gt_lt_y[0])**2) + np.sqrt((c_lt_x[1] - c_gt_lt_x[1])**2 + (c_lt_y[1] - c_gt_lt_y[1])**2))/2, 
-                        (np.sqrt((c_lt_x[0] - c_gt_lt_x[1])**2 + (c_lt_y[0] - c_gt_lt_y[1])**2) + np.sqrt((c_lt_x[1] - c_gt_lt_x[0])**2 + (c_lt_y[1] - c_gt_lt_y[0])**2))/2)
-    err_lb = (np.sqrt((c_lb_x[0] - c_gt_lb_x[0])**2 + (c_lb_y[0] - c_gt_lb_y[0])**2)*2)/2    
-    return err_rc, err_rb, err_lc, err_lb, p_gt, p, c_gt, c_pred
+        p_gt_rc = not np.isnan(c_gt_rt_x[0])
+        p_gt_rb = not np.isnan(c_gt_rb_x[0])
+        p_gt_lc = not np.isnan(c_gt_lt_x[0])
+        p_gt_lb = not np.isnan(c_gt_lb_x[0])
+        p_gt = [p_gt_rc, p_gt_rb, p_gt_lc, p_gt_lb]
+        p_rc = not np.isnan(c_rt_x[0])
+        p_rb = not np.isnan(c_rb_x[0])
+        p_lc = not np.isnan(c_lt_x[0])
+        p_lb = not np.isnan(c_lb_x[0])
+        p = [p_rc, p_rb, p_lc, p_lb]
+        err_rc = np.minimum((np.sqrt((c_rt_x[0] - c_gt_rt_x[0])**2 + (c_rt_y[0] - c_gt_rt_y[0])**2) + np.sqrt((c_rt_x[1] - c_gt_rt_x[1])**2 + (c_rt_y[1] - c_gt_rt_y[1])**2))/2 , 
+                            (np.sqrt((c_rt_x[0] - c_gt_rt_x[1])**2 + (c_rt_y[0] - c_gt_rt_y[1])**2) + np.sqrt((c_rt_x[1] - c_gt_rt_x[0])**2 + (c_rt_y[1] - c_gt_rt_y[0])**2))/2)
+        err_rb = (np.sqrt((c_rb_x[0] - c_gt_rb_x[0])**2 + (c_rb_y[0] - c_gt_rb_y[0])**2)*2)/2
+        err_lc = np.minimum((np.sqrt((c_lt_x[0] - c_gt_lt_x[0])**2 + (c_lt_y[0] - c_gt_lt_y[0])**2) + np.sqrt((c_lt_x[1] - c_gt_lt_x[1])**2 + (c_lt_y[1] - c_gt_lt_y[1])**2))/2, 
+                            (np.sqrt((c_lt_x[0] - c_gt_lt_x[1])**2 + (c_lt_y[0] - c_gt_lt_y[1])**2) + np.sqrt((c_lt_x[1] - c_gt_lt_x[0])**2 + (c_lt_y[1] - c_gt_lt_y[0])**2))/2)
+        err_lb = (np.sqrt((c_lb_x[0] - c_gt_lb_x[0])**2 + (c_lb_y[0] - c_gt_lb_y[0])**2)*2)/2    
+        return err_rc, err_rb, err_lc, err_lb, p_gt, p, c_gt, c_pred
 

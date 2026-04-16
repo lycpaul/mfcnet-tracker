@@ -33,7 +33,7 @@ from src.dataloader import get_data_loader
 from src.loss import get_loss
 from src.metrics import get_metrics
 from models import get_tooltip_segmentation_model as get_model
-from utils.dataloader_utils import load_image, load_attmap, get_MICCAI2017_dataset_filenames, get_JIGSAWS_dataset_filenames
+from utils.dataloader_utils import load_image, load_attmap, get_MICCAI2017_dataset_filenames, get_JIGSAWS_dataset_filenames, get_SurgPose_dataset_filenames
 from utils.log_utils import AverageMeter, ProgressMeter, init_logging
 from utils.model_utils import load_model_weights, save_model
 from utils.train_utils import add_loss_meters, add_metrics_meters
@@ -50,6 +50,8 @@ def save_attention_maps(model, args):
         file_names, val_file_names = get_MICCAI2017_dataset_filenames(args)
     elif args.dataset=='JIGSAWS':
         file_names, val_file_names = get_JIGSAWS_dataset_filenames(args)
+    elif args.dataset=='SurgPose':
+        file_names, val_file_names = get_SurgPose_dataset_filenames(args)
     else:
         raise ValueError(f"Dataset {args.dataset} not recognized")
     file_names.extend(val_file_names)

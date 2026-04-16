@@ -4,6 +4,45 @@ import torch
 from torchvision import transforms
 import torchvision.transforms.functional as tF
 from natsort import natsorted
+import matplotlib.pyplot as plt
+
+def rgb_to_mask(rgb_image_path, palette):
+    """
+    Converts an RGB image with specific colored classes to a single-channel mask
+    based on a provided BGR palette.
+
+    Args:
+        rgb_image_path (str): The path to the input RGB image.
+        palette (dict): A dictionary mapping class IDs (int) to BGR color tuples (B, G, R).
+
+    Returns:
+        numpy.ndarray: A single-channel mask where pixel values (0-5)
+                       represent the corresponding classes. Returns None if image
+                       cannot be loaded.
+    """
+    img = cv2.imread(rgb_image_path) # img will be in BGR format
+
+    if img is None:
+        print(f"Error: Could not load image at {rgb_image_path}")
+        return None
+
+    # If your palette is already in BGR, directly use it as class_colors_bgr
+    class_colors_bgr = palette
+
+    # Create an empty mask with the same dimensions as the input image,
+    # and initialize with zeros (for the background class, which is 0)
+    mask = np.zeros(img.shape[:2], dtype=np.uint8)
+
+    # Iterate through each defined class color (now in BGR) and set the
+    # corresponding pixels in the mask
+    for class_id, bgr_color in class_colors_bgr.items():
+        # Create a boolean mask for pixels matching the current BGR color
+        match_mask = np.all(img == bgr_color, axis=-1)
+
+        # Set the class_id for all pixels that match
+        mask[match_mask] = class_id
+
+    return mask
 
 def load_optflow_map(path, optflow_dir):
     with open(str(path).replace('images', optflow_dir).replace('jpg', 'flo')) as f:
@@ -81,6 +120,36 @@ def load_mask(path, prediction_task):
         mask_folder = 'binary_masks'
         mask = cv2.imread(str(path).replace('images', mask_folder).replace('jpg', 'png'), 0)
         return (mask / binary_factor).astype(np.uint8)
+    elif prediction_task=='surgpose_segmentation_single':
+        '''
+        Process SurgPose dataset Annotations, each keypoint is a different class 
+        Then 5 (kpts) + 1 (bg) = 6 classes in total
+        The kpts color palette (BGR) are:
+        1: (255, 0, 0),
+        2: (0, 255, 0),
+        3: (0, 0, 255),
+        4: (255, 255, 0),
+        5: (0, 255, 255),
+        Not sure why original code regards left and right tool tips as one class. Need double check!
+        '''
+        surgpose_palette = {
+            # 0: (0, 0, 0),        # background
+            1: (255, 0, 0),      # shaft - red
+            2: (0, 255, 0),      # wrist - green
+            3: (0, 0, 255),      # end-effector - blue
+            4: (255, 255, 0),    # left gripper tip - yellow
+            5: (0, 255, 255)     # right gripper tip - cyan
+        }
+        mask = cv2.imread(str(path).replace('regular', 'pose_maps'), 0)
+        if mask is None:
+            print(path)
+        
+        # Convert the mask to a single channel with values 0-5, according to the color palette
+        # For example, if the mask is (255, 0, 0), it should be converted to 1
+        # Please find the region with color (255, 0, 0)
+
+        mask_out = rgb_to_mask(str(path).replace('regular', 'pose_maps'), surgpose_palette)
+        return (mask_out).astype(np.uint8)
     else:
         raise ValueError('Unknown prediction task: {}'.format(prediction_task))
 
@@ -124,24 +193,6 @@ def get_MICCAI2017_dataset_filenames(args):
             test_file_names += natsorted(list((test_path / ('instrument_dataset_' + str(instrument_id)) / 'images').glob('*')), key=str)
         return test_file_names, None
 
-def get_custom_dataset_filenames(args):
-    if args.mode=='training':
-        folds = {-1: [], 0: [1], 1: [2], 2: [1,2]}
-        train_path = args.data_dir / 'train'
-        val_path = args.data_dir / 'val'
-        train_file_names = []
-        val_file_names = []
-        for i in range(1,7):
-            train_file_names += natsorted(list((train_path / ('video_' + str(i)) / 'images_cropped').glob('*')), key=str)
-            val_file_names += natsorted(list((val_path / ('video_' + str(i)) / 'images_cropped').glob('*')), key=str)
-        return train_file_names, val_file_names
-    if args.mode=='testing':
-        test_path = args.data_dir / 'val'
-        test_file_names = []
-        for i in range(1,7):
-            test_file_names += natsorted(list((test_path / ('video_' + str(i)) / 'images_cropped').glob('*')), key=str)
-        return test_file_names, None
-
 def get_JIGSAWS_dataset_filenames(args):
     if args.mode=='training': 
         folds = {-1: [], 0: [1], 1: [2], 2: [1,2]}
@@ -175,6 +226,28 @@ def get_JIGSAWS_dataset_filenames(args):
         #     test_file_names += natsorted(list((test_path / ('random_sample_set_' + str(i)) / 'images').glob('*')), key=str)
         return test_file_names, None
 
+def get_SurgPose_dataset_filenames(args):
+    if args.mode=='training':
+        train_path = args.data_dir / 'train'
+        val_path = args.data_dir / 'val'
+        train_file_names = []
+        val_file_names = []
+        train_data_folders = ['hybrid_big'] #'400004', '400005'
+        val_data_folders = ['400004']
+        for folder in train_data_folders:
+            train_file_names += natsorted(list((train_path / folder / 'regular' / 'left_frames').glob('*')), key=str)
+        for folder in val_data_folders:
+            val_file_names += natsorted(list((val_path / folder / 'regular' / 'left_frames').glob('*')), key=str)
+        if args.sparse_view_ratio is not None:
+            train_file_names = train_file_names[::args.sparse_view_ratio]
+        return train_file_names, val_file_names
+    if args.mode=='testing':
+        test_path = args.data_dir / 'val'
+        test_file_names = []
+        test_data_folders = ['400004']
+        for folder in test_data_folders:
+            test_file_names += natsorted(list((test_path / folder / 'regular' / 'left_frames').glob('*')), key=str)
+        return test_file_names, None
 
 class to_tensor(object):
     """Convert ndarrays in sample to Tensors."""

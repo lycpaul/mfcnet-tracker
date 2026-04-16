@@ -7,6 +7,10 @@ from segmentation_models_pytorch import Segformer
 from torchvision.models.segmentation.deeplabv3 import DeepLabHead
 from torchvision.models.segmentation.fcn import FCNHead
 from torchvision import models
+from torchvision.models.segmentation import (
+    DeepLabV3_ResNet101_Weights,
+    FCN_ResNet101_Weights,
+)
 from .ternausnet import TernausNet11, TernausNet16
 from .tap_model import TAPNet11, TAPNet16
 from .multiframe_model import TernausNetMultiBasic, TernausNetMultiLarge, DeepLabMultiBasic, DeepLabMultiLarge, \
@@ -21,6 +25,8 @@ class IdentityModel(nn.Module):
         return x
 
 def get_tooltip_segmentation_model(args):
+    deeplab_weights = DeepLabV3_ResNet101_Weights.DEFAULT if args.pretrained else None
+    fcn_weights = FCN_ResNet101_Weights.DEFAULT if args.pretrained else None
     if args.model_type == 'TernausNet11':
         model = TernausNet11(num_classes=args.num_classes, num_filters=64, pretrained=args.pretrained)
     elif args.model_type == 'TernausNet16':
@@ -30,10 +36,10 @@ def get_tooltip_segmentation_model(args):
     elif args.model_type == 'TAPNet16':
         model = TAPNet16(in_channels=3, num_classes=args.num_classes, pretrained=args.pretrained)
     elif args.model_type == 'DeepLab_v3':
-        model = models.segmentation.deeplabv3_resnet101(pretrained=args.pretrained, progress=True)
+        model = models.segmentation.deeplabv3_resnet101(weights=deeplab_weights, progress=True)
         model.classifier = DeepLabHead(2048, args.num_classes)
     elif args.model_type == 'FCN':
-        model = models.segmentation.fcn_resnet101(pretrained=args.pretrained, progress=True)
+        model = models.segmentation.fcn_resnet101(weights=fcn_weights, progress=True)
         model.classifier = FCNHead(2048, args.num_classes)
     elif args.model_type == 'HRNet': 
         model = HighResolutionNet()

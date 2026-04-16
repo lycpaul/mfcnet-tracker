@@ -111,6 +111,11 @@ def main_worker(args):
         cudnn.benchmark = True
     else: 
         raise SystemError('GPU device not found! Not configured to train/test.')
+    
+    if args.load_wts_base_model is not None:
+        basemodel_state = torch.load(args.load_wts_base_model)
+        model.base_model.load_state_dict(basemodel_state['model'])
+        logger.info("Base model weights loaded from {}".format(args.load_wts_base_model))
 
     # load pre-trained weights if needed
     model, start_epoch, load_flag = load_model_weights(model, args.load_wts_model, args.model_type)

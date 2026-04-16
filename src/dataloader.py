@@ -315,6 +315,42 @@ def get_data_loader(args):
                 test_dataset = RoboticSurgeryFramesDataset_withoptflow(test_file_names, args.optflow_dir, transform=test_transform, mode=args.mode, prediction_task=args.prediction_task, num_frames=args.num_frames_per_video)
                 test_loader = DataLoader(test_dataset, batch_size=1, shuffle=False, num_workers=args.num_workers, pin_memory=True)
             return None, test_loader
+    if args.dataset == 'SurgPose':
+        if args.mode=='training':
+            train_file_names, val_file_names = get_SurgPose_dataset_filenames(args)
+            print("Train file Number: ", len(train_file_names))
+            if not args.add_optflow_inputs:
+                # train_transform = get_transform('val', args) # not using any transformation
+                train_transform = get_transform('train', args)
+                val_transform = get_transform('val', args)
+                train_dataset = RoboticSurgeryFramesDataset(train_file_names, transform=train_transform, mode=args.mode, prediction_task=args.prediction_task)
+                train_loader = DataLoader(train_dataset, batch_size=args.batch_size, shuffle=True, num_workers=args.num_workers, pin_memory=True, drop_last=True)
+                val_dataset = RoboticSurgeryFramesDataset(val_file_names, transform=val_transform, mode=args.mode, prediction_task=args.prediction_task)
+                val_loader = DataLoader(val_dataset, batch_size=1, shuffle=False, num_workers=args.num_workers, pin_memory=True)
+            else: 
+                assert 'TAPNet' in args.model_type
+                train_transform = get_transform('train', args)
+                val_transform = get_transform('val', args)
+                # train_transform = transforms.Compose([to_tensor(), customResize(), customVertFlip(), customRandomRotation(), customRandomHSVDistortion(), customNormalize()])
+                # val_transform = transforms.Compose([to_tensor(), customResize(), customNormalize()])
+                train_dataset = RoboticSurgeryFramesDataset_withoptflow(train_file_names, args.optflow_dir, transform=train_transform, mode=args.mode, prediction_task=args.prediction_task, num_frames=args.num_frames_per_video)
+                train_loader = DataLoader(train_dataset, batch_size=args.batch_size, shuffle=True, num_workers=args.num_workers, pin_memory=True)
+                val_dataset = RoboticSurgeryFramesDataset_withoptflow(val_file_names, args.optflow_dir, transform=val_transform, mode=args.mode, prediction_task=args.prediction_task, num_frames=args.num_frames_per_video)
+                val_loader = DataLoader(val_dataset, batch_size=1, shuffle=False, num_workers=args.num_workers, pin_memory=True)
+            return train_loader, val_loader
+        if args.mode=='testing':
+            test_file_names, _ = get_SurgPose_dataset_filenames(args)
+            if not args.add_optflow_inputs:
+                test_transform = get_transform('test', args)
+                test_dataset = RoboticSurgeryFramesDataset(test_file_names, transform=test_transform, mode=args.mode, prediction_task=args.prediction_task)
+                test_loader = DataLoader(test_dataset, batch_size=1, shuffle=False, num_workers=args.num_workers, pin_memory=True)
+            else: 
+                assert 'TAPNet' in args.model_type
+                test_transform = get_transform('test', args)
+                # test_transform = transforms.Compose([to_tensor(), customNormalize()])
+                test_dataset = RoboticSurgeryFramesDataset_withoptflow(test_file_names, args.optflow_dir, transform=test_transform, mode=args.mode, prediction_task=args.prediction_task, num_frames=args.num_frames_per_video)
+                test_loader = DataLoader(test_dataset, batch_size=1, shuffle=False, num_workers=args.num_workers, pin_memory=True)
+            return None, test_loader
     else:
         raise ValueError('Unknown dataset: {}'.format(args.dataset))
 
