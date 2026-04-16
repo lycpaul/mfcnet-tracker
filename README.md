@@ -171,12 +171,11 @@ python scripts/test_multiframe_segmentation_on_videos_v3.py \
 --add_depth_inputs True
 ```
 
-## SurgPose Dataset
+## Training on SurgPose Dataset
 
-Project: [SurgPose](https://surgpose.github.io/)
-Github: [SurgPose](https://github.com/zijianwu1231/SurgPose)
-Checkpoint: [model_100.pth](https://drive.google.com/file/d/1dTuyU9W_ArkDWDqRcBILnoow5VpCKJfb/view?usp=sharing)
-Training splits: Traj ID 0,1,2,3,47,32,33 used for training. Traj ID 5,6,30,31 used for validation.
+- Project: [SurgPose](https://surgpose.github.io/)
+- Checkpoint: [model_100.pth](https://drive.google.com/file/d/1dTuyU9W_ArkDWDqRcBILnoow5VpCKJfb/view?usp=sharing)
+- Training splits: Traj ID 0,1,2,3,47,32,33 used for training. Traj ID 5,6,30,31 used for validation.
 
 ### Installation for coco
 
