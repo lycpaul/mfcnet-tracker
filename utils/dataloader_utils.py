@@ -193,6 +193,24 @@ def get_MICCAI2017_dataset_filenames(args):
             test_file_names += natsorted(list((test_path / ('instrument_dataset_' + str(instrument_id)) / 'images').glob('*')), key=str)
         return test_file_names, None
 
+def get_custom_dataset_filenames(args):
+    if args.mode=='training':
+        folds = {-1: [], 0: [1], 1: [2], 2: [1,2]}
+        train_path = args.data_dir / 'train'
+        val_path = args.data_dir / 'val'
+        train_file_names = []
+        val_file_names = []
+        for i in range(1,7):
+            train_file_names += natsorted(list((train_path / ('video_' + str(i)) / 'images_cropped').glob('*')), key=str)
+            val_file_names += natsorted(list((val_path / ('video_' + str(i)) / 'images_cropped').glob('*')), key=str)
+        return train_file_names, val_file_names
+    if args.mode=='testing':
+        test_path = args.data_dir / 'val'
+        test_file_names = []
+        for i in range(1,7):
+            test_file_names += natsorted(list((test_path / ('video_' + str(i)) / 'images_cropped').glob('*')), key=str)
+        return test_file_names, None
+    
 def get_JIGSAWS_dataset_filenames(args):
     if args.mode=='training': 
         folds = {-1: [], 0: [1], 1: [2], 2: [1,2]}

@@ -173,61 +173,32 @@ python scripts/test_multiframe_segmentation_on_videos_v3.py \
 
 ## SurgPose Dataset
 
-### Train
-1. SurgPose:
-```bash
-python scripts/train_toolpose_segmentation.py --data_dir ~/Dataset/surgpose --dataset SurgPose --fold_index -1 --mode training --prediction_task surgpose_segmentation_single --expt_savedir ./results --expt_name SurgPose_test --print_freq 250 --save_freq 5 --lr 3e-5 --num_epochs 20 --scheduler StepDecay --batch_size 4 --num_workers 12 --num_classes 6 --metric_fns iou dice --loss_fns nll soft_jaccard --loss_wts 0.7 0.3 --class_weights 1 1000 1000 1000 1000 1000 --seed 42 --model_type FCN --pretrained True --input_height 480 --input_width 640 --num_frames_per_video 501
-```
-```bash
-python scripts/train_toolpose_segmentation.py --data_dir ~/Dataset/surgpose --dataset SurgPose --fold_index -1 --mode training --prediction_task surgpose_segmentation_single --expt_savedir ./results --expt_name SurgPose_Real --print_freq 250 --save_freq 5 --lr 3e-5 --num_epochs 100 --scheduler StepDecay --batch_size 4 --num_workers 12 --num_classes 6 --metric_fns iou dice --loss_fns nll soft_jaccard --loss_wts 0.7 0.3 --class_weights 1 1000 1000 1000 1000 1000 --seed 42 --model_type FCN --pretrained True --input_height 480 --input_width 640 --num_frames_per_video 200 --sparse_view_ratio 2
-```
+
+### Installation for coco
 
 ```bash
-python scripts/train_toolpose_segmentation.py --data_dir ~/Dataset/surgpose --dataset SurgPose --fold_index -1 --mode training --prediction_task surgpose_segmentation_single --expt_savedir ./results --expt_name SurgPose_hybrid_big --print_freq 250 --save_freq 5 --lr 3e-5 --scheduler StepDecay --batch_size 4 --num_workers 12 --num_classes 6 --metric_fns iou dice --loss_fns nll soft_jaccard --loss_wts 0.7 0.3 --class_weights 1 1000 1000 1000 1000 1000 --seed 42 --model_type FCN --pretrained True --input_height 480 --input_width 640 --num_frames_per_video 200 --num_epochs 20 --sparse_view_ratio 1
-
-python scripts/infer_surgpose_segmentation.py --data_dir ~/Dataset/surgpose --dataset SurgPose --fold_index -1 --mode training --prediction_task surgpose_segmentation_single --expt_savedir ./results --expt_name SurgPose_hybrid_dense --print_freq 250 --save_freq 5 --lr 3e-5 --scheduler StepDecay --batch_size 4 --num_workers 12 --num_classes 6 --metric_fns iou dice --loss_fns nll soft_jaccard --loss_wts 0.7 0.3 --class_weights 1 1000 1000 1000 1000 1000 --seed 42 --model_type FCN --pretrained True --input_height 480 --input_width 640 --num_frames_per_video 200 --num_epochs 50 --sparse_view_ratio 1
-
-python scripts/infer_surgpose_segmentation.py --data_dir ~/Dataset/surgpose --dataset SurgPose --fold_index -1 --prediction_task surgpose_segmentation_single --expt_savedir ./results --expt_name SurgPose_hybrid_big_full --print_freq 250 --save_freq 5 --lr 3e-5 --scheduler StepDecay --batch_size 4 --num_workers 12 --num_classes 6 --metric_fns iou dice --loss_fns nll soft_jaccard --loss_wts 0.7 0.3 --class_weights 1 1000 1000 1000 1000 1000 --seed 42 --model_type FCN --pretrained True --input_height 480 --input_width 640 --num_frames_per_video 200 --num_epochs 50 --sparse_view_ratio 1
-
-python scripts/infer_surgpose_segmentation.py --data_dir ~/Dataset/surgpose --dataset SurgPose --prediction_task surgpose_segmentation_single --expt_savedir ./results --expt_name SurgPose_Syn_dense_full_full  --input_height 480 --input_width 640 
+pip install git+https://github.com/jin-s13/xtcocoapi.git
+pip install git+https://github.com/mattloper/chumpy.git
+python -m pip install --upgrade setuptools pip
+pip install mmpose
+pip install mmengine
+pip install mmcv
 ```
 
----
-*Sample inferencing*
-```bash
-python scripts/infer_surgpose_segmentation.py --data_dir ~/Dataset/surgpose --dataset SurgPose --prediction_task surgpose_segmentation_single --expt_savedir ./results --expt_name SurgPose_hybrid_big_full --print_freq 250 --save_freq 5 --num_workers 12 --num_classes 6 --metric_fns iou dice --seed 42 --model_type FCN --pretrained True --input_height 480 --input_width 640 --num_frames_per_video 200 --pth_file_name model_020.pth
-```
-
----
-*Preprocessing*
-```bash
-python scripts/preprocess_surgcalib_frames.py --only_pose_maps
-```
-
-*Training*
+### Train on SurgPose:
+Training with iou and dice metrics
 ```bash
 python scripts/train_toolpose_segmentation.py --data_dir ~/Dataset/surgpose --dataset SurgPose --fold_index -1 --mode training --prediction_task surgpose_segmentation_single --expt_savedir ./results --expt_name SurgPose_Real --print_freq 250 --save_freq 5 --lr 3e-5 --num_epochs 100 --scheduler StepDecay --batch_size 4 --num_workers 12 --num_classes 6 --metric_fns iou dice --loss_fns nll soft_jaccard --loss_wts 0.7 0.3 --class_weights 1 1000 1000 1000 1000 1000 --seed 42 --model_type DeepLab_v3 --pretrained True --input_height 480 --input_width 640 --num_frames_per_video 200 --sparse_view_ratio 2
 ```
 
-with coco metrics
+Training with iou, dice and coco metrics
 ```bash
 python scripts/train_toolpose_segmentation.py --data_dir ~/Dataset/surgpose --dataset SurgPose --fold_index -1 --mode training --prediction_task surgpose_segmentation_single --expt_savedir ./results --expt_name SurgPose_Real --print_freq 250 --save_freq 5 --lr 3e-5 --num_epochs 100 --scheduler StepDecay --batch_size 8 --num_workers 12 --num_classes 6 --metric_fns iou dice coco --loss_fns nll soft_jaccard --loss_wts 0.7 0.3 --class_weights 1 1000 1000 1000 1000 1000 --seed 42 --model_type DeepLab_v3 --pretrained True --input_height 480 --input_width 640 --num_frames_per_video 200 --sparse_view_ratio 2
 ```
 
+Inferring the SurgPose dataset
 ```bash
-python scripts/infer_surgpose_segmentation.py --data_dir ~/Dataset/surgpose --dataset SurgPose --prediction_task surgpose_segmentation_single --expt_savedir ./results --expt_name SurgPose_Real_full --print_freq 250 --save_freq 5 --num_workers 12 --num_classes 6 --metric_fns iou dice --seed 42 --model_type DeepLab_v3 --pretrained True --input_height 480 --input_width 640 --num_frames_per_video 200 --pth_file_name model_100.pth
-```
-
-inferring the surgcalib dataset
-```bash
-python scripts/infer_surgpose_segmentation.py --data_dir ~/Dataset/surgcalib --dataset SurgPose --prediction_task surgpose_segmentation_single --expt_savedir ./results --expt_name SurgPose_Real_full --print_freq 250 --save_freq 5 --num_workers 12 --num_classes 6 --metric_fns iou dice --seed 42 --model_type DeepLab_v3 --pretrained True --input_height 512 --input_width 640 --num_frames_per_video 200 --pth_file_name model_235.pth
-```
-
-inferring the surgmanip/openhubc dataset
-```bash
-python scripts/infer_surgpose_segmentation.py --data_dir ~/Dataset/openhubc --dataset SurgPose --prediction_task surgpose_segmentation_single --expt_savedir ./results --expt_name SurgPose_Real_full --print_freq 250 --save_freq 5 --num_workers 12 --num_classes 6 --metric_fns iou dice --seed 42 --model_type DeepLab_v3 --pretrained True --input_height 450 --input_width 640 --num_frames_per_video 200 --pth_file_name model_100.pth
-
-python scripts/infer_surgpose_segmentation_fast.py --data_dir ~/Dataset/surgpose --dataset SurgPose --prediction_task surgpose_segmentation_single --expt_savedir ./results --expt_name SurgPose_Real_full --print_freq 250 --save_freq 5 --num_workers 12 --num_classes 6 --metric_fns iou dice coco --seed 42 --model_type DeepLab_v3 --pretrained True --input_height 480 --input_width 640 --num_frames_per_video 200 --pth_file_name model_100.pth
+python scripts/infer_surgpose_segmentation_fast.py --data_dir ~/Dataset/surgpose --dataset SurgPose --prediction_task surgpose_segmentation_single --expt_savedir ./results --expt_name SurgPose_Real_full --print_freq 250 --save_freq 5 --num_workers 12 --num_classes 6 --metric_fns iou dice --seed 42 --model_type DeepLab_v3 --pretrained True --input_height 480 --input_width 640 --num_frames_per_video 200 --pth_file_name model_100.pth --skip_metrics --save_output_freq 1
 ```
 
 Resume with previous training
@@ -262,15 +233,4 @@ python scripts/train_toolpose_segmentation.py \
   --load_wts_model ./results/SurgPose_Real_full/ckpts/model_300.pth \
   --resume True \
   --starting_epoch 301
-```
-
-### Installation for coco
-
-```bash
-pip install git+https://github.com/jin-s13/xtcocoapi.git
-pip install git+https://github.com/mattloper/chumpy.git
-python -m pip install --upgrade setuptools pip
-pip install mmpose
-pip install mmengine
-pip install mmcv
 ```
